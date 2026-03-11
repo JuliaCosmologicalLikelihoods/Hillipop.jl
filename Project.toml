@@ -1,0 +1,33 @@
+name = "Hillipop"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+version = "0.1.0"
+authors = ["Marco Bonici <bonici.marco@gmail.com>"]
+
+[deps]
+Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+CMBForegrounds = "fc0df5e6-91e0-40ab-a79d-ad91d7e99724"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
+[weakdeps]
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[extensions]
+HillipopTuringExt = "Turing"
+
+[compat]
+FITSIO = "0.17.5"
+ForwardDiff = "1.3.2"
+NPZ = "0.4.3"
+Test = "1.11.0"
+
+[extras]
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "JSON"]

@@ -1,0 +1,6 @@
+[planck_PR4_hillipop]
+git-tree-sha1 = "522a25b312213feb14b19f41f854673ec06ec07e"
+
+    [[planck_PR4_hillipop.download]]
+    sha256 = "1b8c1adb3d0c3722c4af7d7bd42f91ed9a8ff212d041757efa397b104d2e62c2"
+    url = "https://zenodo.org/records/18966358/files/planck_PR4_hillipop.tar.xz"
