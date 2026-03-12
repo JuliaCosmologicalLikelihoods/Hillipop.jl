@@ -184,9 +184,8 @@ end
 @model function _hillipop_model_B(h, C, ClTT, ClTE, ClEE, modes)
     nuis ~ to_submodel(hillipop_nuisance_priors(), false)
 
-    # Convert to Dict for the existing build_residual_vector interface
-    T = promote_type(map(typeof, values(nuis))...)
-    pars = Dict{Symbol, T}(pairs(nuis)...)
+    # Convert to HillipopNuisance for the build_residual_vector interface
+    pars = HillipopNuisance(nuis)
 
     # Build the unbinned residual vector and project into binned space
     Xl        = build_residual_vector(ClTT, ClTE, ClEE, pars, h; modes=modes)
