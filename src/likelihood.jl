@@ -30,9 +30,8 @@ Returns just the normalized result when `normed=true`, or `(numerator, weight)` 
 # Returns
 - `(nxfreq, lmax+1)` weighted-average or `((nxfreq, lmax+1), (nxfreq, lmax+1))` unnormed
 """
-function xspectra_to_xfreq(Rspec::AbstractMatrix, weights::AbstractMatrix,
-                             xspec2xfreq::Vector{Int}, nxfreq::Int;
-                             normed::Bool=true)
+function xspectra_to_xfreq_unnormed(Rspec::AbstractMatrix, weights::AbstractMatrix,
+                             xspec2xfreq::Vector{Int}, nxfreq::Int)
     nxspec, lmax1 = size(Rspec)
     T   = eltype(Rspec)
     xcl = zeros(T, nxfreq, lmax1)
@@ -49,14 +48,17 @@ function xspectra_to_xfreq(Rspec::AbstractMatrix, weights::AbstractMatrix,
         end
     end
 
-    if !normed
-        return xcl, xw8
-    end
+    return xcl, xw8
+end
 
+function xspectra_to_xfreq(Rspec::AbstractMatrix, weights::AbstractMatrix,
+                             xspec2xfreq::Vector{Int}, nxfreq::Int)
+    xcl, xw8 = xspectra_to_xfreq_unnormed(Rspec, weights, xspec2xfreq, nxfreq)
+    
     # Safe division: zero-weight entries stay zero
     Rl = similar(xcl)
     for i in eachindex(xcl)
-        Rl[i] = xw8[i] > 0.0 ? xcl[i] / xw8[i] : 0.0
+        Rl[i] = xw8[i] > 0.0 ? xcl[i] / xw8[i] : zero(eltype(Rl))
     end
     return Rl
 end
@@ -79,14 +81,14 @@ into a single flat data vector, matching JAX `_select_spectra`.
 function select_spectra(xcl::AbstractMatrix, lmins::Vector{Int}, lmaxs::Vector{Int},
                          nxfreq::Int, xspec2xfreq::Vector{Int})
     T = eltype(xcl)
-    slices = Vector{T}[]
+    slices = AbstractVector{T}[]
     for xf in 1:nxfreq
         # Find the representative cross-map-spec index for this cross-freq bin
         xs_rep = findfirst(==(xf), xspec2xfreq)
         lmin = lmins[xs_rep]
         lmax = lmaxs[xs_rep]
         # Julia arrays are 1-indexed; ℓ=lmin is at position lmin+1
-        push!(slices, xcl[xf, lmin+1:lmax+1])
+        push!(slices, @view xcl[xf, lmin+1:lmax+1])
     end
     return vcat(slices...)
 end
@@ -163,34 +165,39 @@ function build_residual_vector(ClTT::AbstractVector, ClTE::AbstractVector,
     nxfreq = length(unique(h.frequencies)) * (length(unique(h.frequencies)) + 1) ÷ 2
 
     # Convert input Cl (K², ℓ≥2) → D_ℓ (μK², index 1 = ℓ=0)
-    dlth = Dict(
-        "TT" => _cl_to_dl(ClTT, lmax),
-        "EE" => _cl_to_dl(ClEE, lmax),
-        "TE" => _cl_to_dl(ClTE, lmax),
-        "ET" => _cl_to_dl(ClTE, lmax),
+    dlth = (
+        TT = _cl_to_dl(ClTT, lmax),
+        EE = _cl_to_dl(ClEE, lmax),
+        TE = _cl_to_dl(ClTE, lmax),
+        ET = _cl_to_dl(ClTE, lmax),
     )
 
     T  = promote_type(eltype(ClTT), eltype(ClTE), eltype(ClEE), T_par)
     Xl = T[]
 
-    for mode in ("TT", "EE")
-        mode ∉ modes && continue
-        R  = compute_residuals(mode, dlth[mode], pars, h)
-        Rl = xspectra_to_xfreq(R, h.dlweight[mode], h.xspec2xfreq, nxfreq; normed=true)
-        append!(Xl, select_spectra(Rl, h.lmins[mode], h.lmaxs[mode], nxfreq, h.xspec2xfreq))
+    if "TT" ∈ modes
+        R_tt = compute_residuals("TT", dlth.TT, pars, h)
+        Rl_tt = xspectra_to_xfreq(R_tt, h.dlweight["TT"], h.xspec2xfreq, nxfreq)
+        append!(Xl, select_spectra(Rl_tt, h.lmins["TT"], h.lmaxs["TT"], nxfreq, h.xspec2xfreq))
+    end
+
+    if "EE" ∈ modes
+        R_ee = compute_residuals("EE", dlth.EE, pars, h)
+        Rl_ee = xspectra_to_xfreq(R_ee, h.dlweight["EE"], h.xspec2xfreq, nxfreq)
+        append!(Xl, select_spectra(Rl_ee, h.lmins["EE"], h.lmaxs["EE"], nxfreq, h.xspec2xfreq))
     end
 
     # TE/ET: combine jointly before normalising (matches JAX)
     if "TE" ∈ modes
-        R_te = compute_residuals("TE", dlth["TE"], pars, h)
-        R_et = compute_residuals("ET", dlth["ET"], pars, h)
-        Rnum_te, Rw_te = xspectra_to_xfreq(R_te, h.dlweight["TE"], h.xspec2xfreq, nxfreq; normed=false)
-        Rnum_et, Rw_et = xspectra_to_xfreq(R_et, h.dlweight["ET"], h.xspec2xfreq, nxfreq; normed=false)
+        R_te = compute_residuals("TE", dlth.TE, pars, h)
+        R_et = compute_residuals("ET", dlth.ET, pars, h)
+        Rnum_te, Rw_te = xspectra_to_xfreq_unnormed(R_te, h.dlweight["TE"], h.xspec2xfreq, nxfreq)
+        Rnum_et, Rw_et = xspectra_to_xfreq_unnormed(R_et, h.dlweight["ET"], h.xspec2xfreq, nxfreq)
         Rnum  = Rnum_te .+ Rnum_et
         Rw    = Rw_te   .+ Rw_et
         Rl_te = similar(Rnum)
         for i in eachindex(Rnum)
-            Rl_te[i] = Rw[i] > 0 ? Rnum[i] / Rw[i] : zero(T)
+            Rl_te[i] = Rw[i] > 0 ? Rnum[i] / Rw[i] : zero(eltype(Rl_te))
         end
         append!(Xl, select_spectra(Rl_te, h.lmins["TE"], h.lmaxs["TE"], nxfreq, h.xspec2xfreq))
     end

@@ -18,7 +18,7 @@ struct HillipopData
     dlweight::Dict{String, Matrix{Float64}}
 
     # Pre-compressed inverse covariance
-    binning_matrix::Matrix{Float64}    # (nbins, data_vector_length)
+    binning_matrix::SparseMatrixCSC{Float64, Int}    # (nbins, data_vector_length)
     binned_invkll::Matrix{Float64}     # (nbins, nbins)
 
     # Map of 15 cross-map-spectra → 6 cross-frequency indices (0-based)

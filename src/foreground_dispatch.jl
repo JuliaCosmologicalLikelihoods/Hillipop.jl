@@ -75,6 +75,17 @@ function _dust_AB(mode::String, pars::HillipopNuisance)
 end
 
 
+function _get_subpixel(subpixel::HillipopSubPixel, f1::Int, f2::Int)
+    if f1 == 100 && f2 == 100 return subpixel.Asbpx_100x100
+    elseif (f1 == 100 && f2 == 143) || (f1 == 143 && f2 == 100) return subpixel.Asbpx_100x143
+    elseif (f1 == 100 && f2 == 217) || (f1 == 217 && f2 == 100) return subpixel.Asbpx_100x217
+    elseif f1 == 143 && f2 == 143 return subpixel.Asbpx_143x143
+    elseif (f1 == 143 && f2 == 217) || (f1 == 217 && f2 == 143) return subpixel.Asbpx_143x217
+    elseif f1 == 217 && f2 == 217 return subpixel.Asbpx_217x217
+    else return zero(subpixel.Asbpx_100x100)
+    end
+end
+
 """
     compute_foreground_dl(mode, xs, f1, f2, ell, pars, h)
 
@@ -90,12 +101,10 @@ Returns a `Vector{Float64}` of length `lmax+1`.
 - `pars`: `Dict{Symbol,Float64}` of nuisance parameters
 - `h`: `HillipopData` struct (for templates and lmax)
 """
-function compute_foreground_dl(mode::String, f1::Int, f2::Int,
+function compute_foreground_dl!(result::AbstractVector, mode::String, f1::Int, f2::Int,
                                ell::AbstractVector, pars::HillipopNuisance{T_par},
                                h::HillipopData) where {T_par}
-    lmax = h.lmax
-    result = zeros(T_par, lmax + 1)
-    ll2pi = _ll2pi(lmax)
+    fill!(result, zero(eltype(result)))
 
     # ------------------------------------------------------------------
     # 1. Galactic Dust (template-based)
@@ -183,8 +192,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     # 8. Sub-pixel effect (TT only)
     # ------------------------------------------------------------------
     if mode == "TT"
-        key = Symbol("Asbpx_$(f1)x$(f2)")
-        subpx_val = getproperty(pars.subpixel, key)
+        subpx_val = _get_subpixel(pars.subpixel, f1, f2)
         if subpx_val != 0
             result .+= sub_pixel_power(ell, subpx_val,
                                         Float64(FWHM_ARCMIN[f1]),
@@ -192,6 +200,14 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
         end
     end
 
+    return result
+end
+
+function compute_foreground_dl(mode::String, f1::Int, f2::Int,
+                               ell::AbstractVector, pars::HillipopNuisance{T_par},
+                               h::HillipopData) where {T_par}
+    result = zeros(T_par, h.lmax + 1)
+    compute_foreground_dl!(result, mode, f1, f2, ell, pars, h)
     return result
 end
 

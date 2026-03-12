@@ -24,6 +24,7 @@ using CMBForegrounds
 using FITSIO
 using Artifacts
 using NPZ
+using SparseArrays
 include("nuisance.jl")
 include("structs.jl")
 include("data_io.jl")

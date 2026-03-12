@@ -291,7 +291,8 @@ function load_hillipop(data_dir::AbstractString=artifact"planck_PR4_hillipop"; l
     # --- Compressed inverse covariance ---
     bmat_file = joinpath(data_dir, "binning_matrix_dense.npy")
     bkll_file = joinpath(data_dir, "binned_invkll_dense.npy")
-    binning_matrix, binned_invkll = read_invkll_npy(bmat_file, bkll_file)
+    binning_matrix_dense, binned_invkll = read_invkll_npy(bmat_file, bkll_file)
+    binning_matrix = sparse(binning_matrix_dense)
 
     # --- xspec→xfreq map ---
     xspec2xfreq = _build_xspec2xfreq(frequencies)

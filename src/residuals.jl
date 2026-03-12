@@ -29,11 +29,33 @@ Compute the calibration scale factor for cross-map-spectrum (map1 × map2) in `m
 # Returns
 - Scalar `Float64` calibration factor
 """
+function _get_cal(cal::HillipopCalibration, mapname::String)
+    if mapname == "100A" return cal.cal100A
+    elseif mapname == "100B" return cal.cal100B
+    elseif mapname == "143A" return cal.cal143A
+    elseif mapname == "143B" return cal.cal143B
+    elseif mapname == "217A" return cal.cal217A
+    elseif mapname == "217B" return cal.cal217B
+    else throw(ArgumentError("Unknown map $mapname"))
+    end
+end
+
+function _get_pe(cal::HillipopCalibration, mapname::String)
+    if mapname == "100A" return cal.pe100A
+    elseif mapname == "100B" return cal.pe100B
+    elseif mapname == "143A" return cal.pe143A
+    elseif mapname == "143B" return cal.pe143B
+    elseif mapname == "217A" return cal.pe217A
+    elseif mapname == "217B" return cal.pe217B
+    else throw(ArgumentError("Unknown map $mapname"))
+    end
+end
+
 function _cal_factor(mode::String, map1::String, map2::String, pars::HillipopNuisance)
-    c1 = getproperty(pars.cal, Symbol("cal$(map1)"))
-    c2 = getproperty(pars.cal, Symbol("cal$(map2)"))
-    pe1 = getproperty(pars.cal, Symbol("pe$(map1)"))
-    pe2 = getproperty(pars.cal, Symbol("pe$(map2)"))
+    c1 = _get_cal(pars.cal, map1)
+    c2 = _get_cal(pars.cal, map2)
+    pe1 = _get_pe(pars.cal, map1)
+    pe2 = _get_pe(pars.cal, map2)
     Apl = pars.cal.A_planck
 
     if mode == "TT"
@@ -76,23 +98,21 @@ function compute_residuals(mode::String, dlth::AbstractVector,
         push!(pairs, (mapnames[i], mapnames[j], frequencies[i], frequencies[j]))
     end
 
-    ell = collect(0:lmax)
+    ell = 0:lmax
+    dldata_mode = h.dldata[mode]
 
-    # Foreground contributions (list of 15 D_ℓ vectors)
-    pair_freqs = [(f1, f2) for (_, _, f1, f2) in pairs]
-    dlmodel_fgs = compute_fg_model(mode, pair_freqs, ell, pars, h)
-
-    # Observed data for this mode
-    dldata_mode = h.dldata[mode]   # (nxspec, lmax+1)
-
-    # Residuals
     T_val = promote_type(eltype(dlth), T_par)
     R = zeros(T_val, nxspec, lmax + 1)
+    dlmodel_fg = zeros(T_val, lmax + 1)
+    
     for (xs, (map1, map2, f1, f2)) in enumerate(pairs)
         cal = _cal_factor(mode, map1, map2, pars)
-        dlmodel_xs = dlth .+ dlmodel_fgs[xs]
+        
+        # In-place compute foreground for this pair
+        compute_foreground_dl!(dlmodel_fg, mode, f1, f2, ell, pars, h)
+        
         for l in 1:lmax+1
-            R[xs, l] = dldata_mode[xs, l] - cal * dlmodel_xs[l]
+            R[xs, l] = dldata_mode[xs, l] - cal * (dlth[l] + dlmodel_fg[l])
         end
     end
 
