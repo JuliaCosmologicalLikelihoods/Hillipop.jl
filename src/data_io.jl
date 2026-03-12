@@ -310,12 +310,17 @@ function load_hillipop(data_dir::AbstractString=artifact"planck_PR4_hillipop"; l
     cib_template   = read_fg_template(joinpath(fg_dir, "CIB_Planck_PR4_model.txt");  lmax=lmax)
     szxcib_template = read_fg_template(joinpath(fg_dir, "SZxCIB_Planck_PR4_model.txt"); lmax=lmax)
 
+    # --- Pre-compute map pairs ---
+    n = length(mapnames)
+    pairs = [(mapnames[i], mapnames[j], frequencies[i], frequencies[j]) for i in 1:n for j in i+1:n]
+
     return HillipopData(
         lmins, lmaxs,
         dldata, dlweight,
         binning_matrix, binned_invkll,
         xspec2xfreq,
         mapnames, frequencies,
+        pairs,
         lmax,
         dust_templates,
         tsz_template, ksz_template, cib_template, szxcib_template

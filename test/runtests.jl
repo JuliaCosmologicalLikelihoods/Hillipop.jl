@@ -236,3 +236,12 @@ using ForwardDiff
     @test length(grad) == length(vals_arr)
     @test all(isfinite.(grad))
 end
+
+using Pkg
+if haskey(Pkg.project().dependencies, "CLASS") || haskey(Pkg.project().dependencies, "CLASS_jll")
+    include("test_class_integration.jl")
+end
+
+if haskey(Pkg.project().dependencies, "DifferentiationInterface")
+    include("test_ad.jl")
+end

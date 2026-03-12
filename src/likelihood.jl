@@ -34,19 +34,11 @@ function xspectra_to_xfreq_unnormed(Rspec::AbstractMatrix, weights::AbstractMatr
                              xspec2xfreq::Vector{Int}, nxfreq::Int)
     nxspec, lmax1 = size(Rspec)
     T   = eltype(Rspec)
-    xcl = zeros(T, nxfreq, lmax1)
-    xw8 = zeros(T, nxfreq, lmax1)
-
-    for xs in 1:nxspec
-        xf = xspec2xfreq[xs]
-        for l in 1:lmax1
-            w = weights[xs, l]
-            if isfinite(w) && w > 0.0
-                xcl[xf, l] += w * Rspec[xs, l]
-                xw8[xf, l] += w
-            end
-        end
-    end
+    
+    # We can use a more functional approach to avoid mutation
+    # For each xf, we sum over xs where xspec2xfreq[xs] == xf
+    xcl = [sum(weights[xs, l] * Rspec[xs, l] for xs in 1:nxspec if xspec2xfreq[xs] == xf && isfinite(weights[xs, l]) && weights[xs, l] > 0.0; init=zero(T)) for xf in 1:nxfreq, l in 1:lmax1]
+    xw8 = [sum(weights[xs, l] for xs in 1:nxspec if xspec2xfreq[xs] == xf && isfinite(weights[xs, l]) && weights[xs, l] > 0.0; init=zero(T)) for xf in 1:nxfreq, l in 1:lmax1]
 
     return xcl, xw8
 end
@@ -56,11 +48,7 @@ function xspectra_to_xfreq(Rspec::AbstractMatrix, weights::AbstractMatrix,
     xcl, xw8 = xspectra_to_xfreq_unnormed(Rspec, weights, xspec2xfreq, nxfreq)
     
     # Safe division: zero-weight entries stay zero
-    Rl = similar(xcl)
-    for i in eachindex(xcl)
-        Rl[i] = xw8[i] > 0.0 ? xcl[i] / xw8[i] : zero(eltype(Rl))
-    end
-    return Rl
+    return @. ifelse(xw8 > 0.0, xcl / xw8, zero(eltype(xcl)))
 end
 
 
@@ -81,14 +69,14 @@ into a single flat data vector, matching JAX `_select_spectra`.
 function select_spectra(xcl::AbstractMatrix, lmins::Vector{Int}, lmaxs::Vector{Int},
                          nxfreq::Int, xspec2xfreq::Vector{Int})
     T = eltype(xcl)
-    slices = AbstractVector{T}[]
-    for xf in 1:nxfreq
+    # Using a comprehension to avoid push!
+    slices = map(1:nxfreq) do xf
         # Find the representative cross-map-spec index for this cross-freq bin
         xs_rep = findfirst(==(xf), xspec2xfreq)
         lmin = lmins[xs_rep]
         lmax = lmaxs[xs_rep]
         # Julia arrays are 1-indexed; ℓ=lmin is at position lmin+1
-        push!(slices, @view xcl[xf, lmin+1:lmax+1])
+        return xcl[xf, lmin+1:lmax+1]
     end
     return vcat(slices...)
 end
@@ -126,12 +114,18 @@ for ℓ in 0..lmax, prepending zeros for ℓ=0,1.
 - `Vector{Float64}` of length lmax+1
 """
 function _cl_to_dl(Cl::AbstractVector, lmax::Int)
-    dl = zeros(eltype(Cl), lmax + 1)
-    ells = 2:min(lmax, length(Cl) + 1)
-    for l in ells
-        cl_idx = l - 1   # Cl[1] = C_ℓ=2
-        if cl_idx <= length(Cl)
-            dl[l+1] = Cl[cl_idx] * 1e12 * l * (l + 1) / (2π)
+    # Using a non-mutating approach: map or comprehension
+    # l=0,1 are zero; l>=2 comes from Cl
+    dl = map(0:lmax) do l
+        if l < 2
+            return zero(eltype(Cl))
+        else
+            cl_idx = l - 1
+            if cl_idx <= length(Cl)
+                return Cl[cl_idx] * 1e12 * l * (l + 1) / (2π)
+            else
+                return zero(eltype(Cl))
+            end
         end
     end
     return dl
@@ -172,37 +166,40 @@ function build_residual_vector(ClTT::AbstractVector, ClTE::AbstractVector,
         ET = _cl_to_dl(ClTE, lmax),
     )
 
-    T  = promote_type(eltype(ClTT), eltype(ClTE), eltype(ClEE), T_par)
-    Xl = T[]
-
-    if "TT" ∈ modes
+    # TT mode part
+    Xl_tt = if "TT" ∈ modes
         R_tt = compute_residuals("TT", dlth.TT, pars, h)
         Rl_tt = xspectra_to_xfreq(R_tt, h.dlweight["TT"], h.xspec2xfreq, nxfreq)
-        append!(Xl, select_spectra(Rl_tt, h.lmins["TT"], h.lmaxs["TT"], nxfreq, h.xspec2xfreq))
+        select_spectra(Rl_tt, h.lmins["TT"], h.lmaxs["TT"], nxfreq, h.xspec2xfreq)
+    else
+        empty(ClTT)
     end
 
-    if "EE" ∈ modes
+    # EE mode part
+    Xl_ee = if "EE" ∈ modes
         R_ee = compute_residuals("EE", dlth.EE, pars, h)
         Rl_ee = xspectra_to_xfreq(R_ee, h.dlweight["EE"], h.xspec2xfreq, nxfreq)
-        append!(Xl, select_spectra(Rl_ee, h.lmins["EE"], h.lmaxs["EE"], nxfreq, h.xspec2xfreq))
+        select_spectra(Rl_ee, h.lmins["EE"], h.lmaxs["EE"], nxfreq, h.xspec2xfreq)
+    else
+        empty(ClEE)
     end
 
-    # TE/ET: combine jointly before normalising (matches JAX)
-    if "TE" ∈ modes
+    # TE mode part
+    Xl_te = if "TE" ∈ modes
         R_te = compute_residuals("TE", dlth.TE, pars, h)
         R_et = compute_residuals("ET", dlth.ET, pars, h)
         Rnum_te, Rw_te = xspectra_to_xfreq_unnormed(R_te, h.dlweight["TE"], h.xspec2xfreq, nxfreq)
         Rnum_et, Rw_et = xspectra_to_xfreq_unnormed(R_et, h.dlweight["ET"], h.xspec2xfreq, nxfreq)
         Rnum  = Rnum_te .+ Rnum_et
         Rw    = Rw_te   .+ Rw_et
-        Rl_te = similar(Rnum)
-        for i in eachindex(Rnum)
-            Rl_te[i] = Rw[i] > 0 ? Rnum[i] / Rw[i] : zero(eltype(Rl_te))
-        end
-        append!(Xl, select_spectra(Rl_te, h.lmins["TE"], h.lmaxs["TE"], nxfreq, h.xspec2xfreq))
+        
+        Rl_te = @. ifelse(Rw > 0.0, Rnum / Rw, zero(eltype(Rnum)))
+        select_spectra(Rl_te, h.lmins["TE"], h.lmaxs["TE"], nxfreq, h.xspec2xfreq)
+    else
+        empty(ClTE)
     end
 
-    return Xl
+    return vcat(Xl_tt, Xl_ee, Xl_te)
 end
 
 
@@ -241,6 +238,12 @@ function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::Abstr
     Xl   = build_residual_vector(ClTT, ClTE, ClEE, pars, h; modes=modes)
     chi2 = compute_chi2(Xl, h.binning_matrix, h.binned_invkll)
     return -0.5 * chi2
+end
+
+function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,
+                          pars::NamedTuple, h::HillipopData;
+                          modes::Tuple=("TT", "EE", "TE"))
+    return compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(pars), h; modes=modes)
 end
 
 function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,

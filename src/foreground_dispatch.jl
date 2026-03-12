@@ -101,113 +101,92 @@ Returns a `Vector{Float64}` of length `lmax+1`.
 - `pars`: `Dict{Symbol,Float64}` of nuisance parameters
 - `h`: `HillipopData` struct (for templates and lmax)
 """
-function compute_foreground_dl!(result::AbstractVector, mode::String, f1::Int, f2::Int,
+function compute_foreground_dl(mode::String, f1::Int, f2::Int,
                                ell::AbstractVector, pars::HillipopNuisance{T_par},
                                h::HillipopData) where {T_par}
-    fill!(result, zero(eltype(result)))
-
-    # ------------------------------------------------------------------
+    lmax = h.lmax
+    T = T_par
+    
     # 1. Galactic Dust (template-based)
-    # ------------------------------------------------------------------
     tidx = _dust_template_idx(f1, f2)
     tmpl_dust = h.dust_templates[mode][tidx]
     A1, A2, β1, β2 = _dust_AB(mode, pars)
-    result .+= dust_model_template_power(ell, tmpl_dust, A1, A2, β1, β2,
+    res = dust_model_template_power(ell, tmpl_dust, A1, A2, β1, β2,
                                           Float64(EFF_FREQ_DUST[f1]),
                                           Float64(EFF_FREQ_DUST[f2]),
                                           DUST_FREQ_REF, 19.6)
 
-    # ------------------------------------------------------------------
     # 2. tSZ (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
         ef1 = Float64(EFF_FREQ_SZ[f1])
         ef2 = Float64(EFF_FREQ_SZ[f2])
-        # α_tSZ = 0: template already encodes shape; ℓ_pivot is irrelevant
-        sz = tsz_cross_power(h.tsz_template, pars.sz.Atsz, ef1, ef2,
+        res = res .+ tsz_cross_power(h.tsz_template, pars.sz.Atsz, ef1, ef2,
                               FG_FREQ_REF, 0.0, 3000.0, ell)
-        result .+= sz
     end
 
-    # ------------------------------------------------------------------
-    # 3. kSZ (TT only, frequency-independent)
-    # ------------------------------------------------------------------
+    # 3. kSZ (TT only)
     if mode == "TT"
-        result .+= ksz_template_scaled(h.ksz_template, pars.sz.Aksz)
+        res = res .+ ksz_template_scaled(h.ksz_template, pars.sz.Aksz)
     end
 
-    # ------------------------------------------------------------------
     # 4. Clustered CIB (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
         ef1 = Float64(EFF_FREQ_CIB[f1])
         ef2 = Float64(EFF_FREQ_CIB[f2])
-        # Use pre-loaded template: scale by A_cib × cib_sed(f1) × cib_sed(f2)
-        # cib_clustered_power with α=0, z=1 reduces to A_CIB * s1 * s2 * (ℓ/3000)^0 = A_CIB*s1*s2
-        # but Hillipop uses a file template, not a pure power law.
-        # We therefore apply the SED scaling manually to the template:
         s1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef1)
         s2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef2)
-        result .+= pars.cib.Acib * s1 * s2 .* h.cib_template
+        res = res .+ (pars.cib.Acib * s1 * s2 .* h.cib_template)
     end
 
-    # ------------------------------------------------------------------
     # 5. SZ×CIB (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
         ef_sz1  = Float64(EFF_FREQ_SZ[f1])
         ef_sz2  = Float64(EFF_FREQ_SZ[f2])
         ef_cib1 = Float64(EFF_FREQ_CIB[f1])
         ef_cib2 = Float64(EFF_FREQ_CIB[f2])
-        # JAX formula: -xi * sqrt(Acib*Atsz) * [tszRatio(f2)*cibRatio(f1,β) + tszRatio(f1)*cibRatio(f2,β)] * x_tmpl
-        # Translated directly for numerical accuracy:
         tr1 = tsz_g_ratio(ef_sz1, FG_FREQ_REF, 2.72548)
         tr2 = tsz_g_ratio(ef_sz2, FG_FREQ_REF, 2.72548)
         cr1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib1)
         cr2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib2)
         xi_factor = -pars.cib.xi * sqrt(pars.cib.Acib * pars.sz.Atsz) * (tr2 * cr1 + tr1 * cr2)
-        result .+= xi_factor .* h.szxcib_template
+        res = res .+ (xi_factor .* h.szxcib_template)
     end
 
-    # ------------------------------------------------------------------
     # 6. Radio Point Sources (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
-        ef1 = Float64(EFF_FREQ_RADIO[f1])
-        ef2 = Float64(EFF_FREQ_RADIO[f2])
-        result .+= radio_ps_power(ell, pars.ps.Aradio, pars.ps.beta_radio, ef1, ef2, FG_FREQ_REF)
+        res = res .+ radio_ps_power(ell, pars.ps.Aradio, pars.ps.beta_radio, 
+                                   Float64(EFF_FREQ_RADIO[f1]), 
+                                   Float64(EFF_FREQ_RADIO[f2]), FG_FREQ_REF)
     end
 
-    # ------------------------------------------------------------------
     # 7. Dusty Point Sources (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
-        ef1 = Float64(EFF_FREQ_CIB[f1])
-        ef2 = Float64(EFF_FREQ_CIB[f2])
-        result .+= dusty_ps_power(ell, pars.ps.Adusty, pars.cib.beta_cib,
-                                   ef1, ef2, FG_FREQ_REF, 25.0)
+        res = res .+ dusty_ps_power(ell, pars.ps.Adusty, pars.cib.beta_cib,
+                                   Float64(EFF_FREQ_CIB[f1]), 
+                                   Float64(EFF_FREQ_CIB[f2]), FG_FREQ_REF, 25.0)
     end
 
-    # ------------------------------------------------------------------
     # 8. Sub-pixel effect (TT only)
-    # ------------------------------------------------------------------
     if mode == "TT"
         subpx_val = _get_subpixel(pars.subpixel, f1, f2)
         if subpx_val != 0
-            result .+= sub_pixel_power(ell, subpx_val,
+            res = res .+ sub_pixel_power(ell, subpx_val,
                                         Float64(FWHM_ARCMIN[f1]),
                                         Float64(FWHM_ARCMIN[f2]))
         end
     end
 
-    return result
+    return res
 end
 
-function compute_foreground_dl(mode::String, f1::Int, f2::Int,
+# Keep compute_foreground_dl! for backward compatibility or ForwardDiff performance,
+# but internally use the non-mutating one if we want Zygote.
+# Actually, let's just use the non-mutating one everywhere to be safe.
+function compute_foreground_dl!(result::AbstractVector, mode::String, f1::Int, f2::Int,
                                ell::AbstractVector, pars::HillipopNuisance{T_par},
                                h::HillipopData) where {T_par}
-    result = zeros(T_par, h.lmax + 1)
-    compute_foreground_dl!(result, mode, f1, f2, ell, pars, h)
+    res = compute_foreground_dl(mode, f1, f2, ell, pars, h)
+    result .= res
     return result
 end
 

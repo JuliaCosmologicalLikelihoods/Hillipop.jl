@@ -28,6 +28,9 @@ struct HillipopData
     mapnames::Vector{String}
     frequencies::Vector{Int}
 
+    # Pre-computed map pairs (map1, map2, f1, f2) for residuals
+    pairs::Vector{Tuple{String, String, Int, Int}}
+
     # ℓ_max used for theory spectra
     lmax::Int
 

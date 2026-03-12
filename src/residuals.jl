@@ -86,35 +86,24 @@ Compute [D_data - cal * D_model] for all 15 cross-map-pair spectra.
 """
 function compute_residuals(mode::String, dlth::AbstractVector,
                            pars::HillipopNuisance{T_par}, h::HillipopData) where {T_par}
-    mapnames     = h.mapnames
-    frequencies  = h.frequencies
     lmax         = h.lmax
-    nxspec       = length(h.mapnames) * (length(h.mapnames) - 1) ÷ 2
-
-    # Build list of (map1, map2, f1, f2) for all 15 pairs
-    pairs = Tuple{String,String,Int,Int}[]
-    n = length(mapnames)
-    for i in 1:n, j in i+1:n
-        push!(pairs, (mapnames[i], mapnames[j], frequencies[i], frequencies[j]))
-    end
-
     ell = 0:lmax
     dldata_mode = h.dldata[mode]
 
     T_val = promote_type(eltype(dlth), T_par)
-    R = zeros(T_val, nxspec, lmax + 1)
-    dlmodel_fg = zeros(T_val, lmax + 1)
     
-    for (xs, (map1, map2, f1, f2)) in enumerate(pairs)
+    # Non-mutating way to build the residual matrix:
+    # R[xs, l] = data - cal * (theory + fg)
+    
+    # We can use a comprehension to build rows
+    R_rows = map(enumerate(h.pairs)) do (xs, (map1, map2, f1, f2))
         cal = _cal_factor(mode, map1, map2, pars)
+        dlmodel_fg = compute_foreground_dl(mode, f1, f2, ell, pars, h)
         
-        # In-place compute foreground for this pair
-        compute_foreground_dl!(dlmodel_fg, mode, f1, f2, ell, pars, h)
-        
-        for l in 1:lmax+1
-            R[xs, l] = dldata_mode[xs, l] - cal * (dlth[l] + dlmodel_fg[l])
-        end
+        # Row vector for this xs
+        return dldata_mode[xs, :] .- cal .* (dlth .+ dlmodel_fg)
     end
 
-    return R
+    # Stack rows into a matrix using stack (Julia 1.9+)
+    return stack(R_rows; dims=1)
 end
