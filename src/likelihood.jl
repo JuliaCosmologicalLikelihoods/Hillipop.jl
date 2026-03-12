@@ -157,8 +157,8 @@ that constructs the likelihood as `Xl_binned ~ MvNormal(0, C)` directly.
   compressed binned vector needed for `h.binned_invkll`.
 """
 function build_residual_vector(ClTT::AbstractVector, ClTE::AbstractVector,
-                                ClEE::AbstractVector, pars, h::HillipopData;
-                                modes::Tuple=("TT", "EE", "TE"))
+                                ClEE::AbstractVector, pars::HillipopNuisance{T_par}, h::HillipopData;
+                                modes::Tuple=("TT", "EE", "TE")) where {T_par}
     lmax   = h.lmax
     nxfreq = length(unique(h.frequencies)) * (length(unique(h.frequencies)) + 1) ÷ 2
 
@@ -170,7 +170,7 @@ function build_residual_vector(ClTT::AbstractVector, ClTE::AbstractVector,
         "ET" => _cl_to_dl(ClTE, lmax),
     )
 
-    T  = promote_type(eltype(ClTT), eltype(ClTE), eltype(ClEE), valtype(pars))
+    T  = promote_type(eltype(ClTT), eltype(ClTE), eltype(ClEE), T_par)
     Xl = T[]
 
     for mode in ("TT", "EE")
@@ -206,7 +206,7 @@ Compute the Hillipop PR4 log-likelihood.
 
 # Arguments
 - `ClTT`, `ClTE`, `ClEE`: `Vector` of C_ℓ in K², starting at ℓ=2
-- `pars`: `Dict{Symbol}` of nuisance parameters (see parameter list below)
+- `pars`: `HillipopNuisance` (or `Dict{Symbol}`) of nuisance parameters (see parameter list below)
 - `h`: `HillipopData` struct from `load_hillipop`
 
 # Keywords
@@ -229,9 +229,15 @@ Compute the Hillipop PR4 log-likelihood.
 - Scalar log-likelihood value
 """
 function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,
-                          pars::Dict{Symbol}, h::HillipopData;
+                          pars::HillipopNuisance, h::HillipopData;
                           modes::Tuple=("TT", "EE", "TE"))
     Xl   = build_residual_vector(ClTT, ClTE, ClEE, pars, h; modes=modes)
     chi2 = compute_chi2(Xl, h.binning_matrix, h.binned_invkll)
     return -0.5 * chi2
+end
+
+function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,
+                          pars::Dict{Symbol}, h::HillipopData;
+                          modes::Tuple=("TT", "EE", "TE"))
+    return compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(pars), h; modes=modes)
 end

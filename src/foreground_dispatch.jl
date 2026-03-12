@@ -62,15 +62,15 @@ end
 # ---------------------------------------------------------------------------
 # Dust T/P amplitude dispatch
 # ---------------------------------------------------------------------------
-function _dust_AB(mode::String, pars)
+function _dust_AB(mode::String, pars::HillipopNuisance)
     if mode == "TT"
-        return pars[:AdustT], pars[:AdustT], pars[:beta_dustT], pars[:beta_dustT]
+        return pars.dust.AdustT, pars.dust.AdustT, pars.dust.beta_dustT, pars.dust.beta_dustT
     elseif mode == "EE"
-        return pars[:AdustP], pars[:AdustP], pars[:beta_dustP], pars[:beta_dustP]
+        return pars.dust.AdustP, pars.dust.AdustP, pars.dust.beta_dustP, pars.dust.beta_dustP
     elseif mode == "TE"
-        return pars[:AdustT], pars[:AdustP], pars[:beta_dustT], pars[:beta_dustP]
+        return pars.dust.AdustT, pars.dust.AdustP, pars.dust.beta_dustT, pars.dust.beta_dustP
     else  # ET
-        return pars[:AdustP], pars[:AdustT], pars[:beta_dustP], pars[:beta_dustT]
+        return pars.dust.AdustP, pars.dust.AdustT, pars.dust.beta_dustP, pars.dust.beta_dustT
     end
 end
 
@@ -91,10 +91,9 @@ Returns a `Vector{Float64}` of length `lmax+1`.
 - `h`: `HillipopData` struct (for templates and lmax)
 """
 function compute_foreground_dl(mode::String, f1::Int, f2::Int,
-                               ell::AbstractVector, pars::Dict{Symbol},
-                               h::HillipopData)
+                               ell::AbstractVector, pars::HillipopNuisance{T_par},
+                               h::HillipopData) where {T_par}
     lmax = h.lmax
-    T_par = valtype(pars)
     result = zeros(T_par, lmax + 1)
     ll2pi = _ll2pi(lmax)
 
@@ -116,7 +115,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
         ef1 = Float64(EFF_FREQ_SZ[f1])
         ef2 = Float64(EFF_FREQ_SZ[f2])
         # α_tSZ = 0: template already encodes shape; ℓ_pivot is irrelevant
-        sz = tsz_cross_power(h.tsz_template, pars[:Atsz], ef1, ef2,
+        sz = tsz_cross_power(h.tsz_template, pars.sz.Atsz, ef1, ef2,
                               FG_FREQ_REF, 0.0, 3000.0, ell)
         result .+= sz
     end
@@ -125,7 +124,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     # 3. kSZ (TT only, frequency-independent)
     # ------------------------------------------------------------------
     if mode == "TT"
-        result .+= ksz_template_scaled(h.ksz_template, pars[:Aksz])
+        result .+= ksz_template_scaled(h.ksz_template, pars.sz.Aksz)
     end
 
     # ------------------------------------------------------------------
@@ -138,9 +137,9 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
         # cib_clustered_power with α=0, z=1 reduces to A_CIB * s1 * s2 * (ℓ/3000)^0 = A_CIB*s1*s2
         # but Hillipop uses a file template, not a pure power law.
         # We therefore apply the SED scaling manually to the template:
-        s1 = cib_mbb_sed_weight(pars[:beta_cib], 25.0, FG_FREQ_REF, ef1)
-        s2 = cib_mbb_sed_weight(pars[:beta_cib], 25.0, FG_FREQ_REF, ef2)
-        result .+= pars[:Acib] * s1 * s2 .* h.cib_template
+        s1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef1)
+        s2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef2)
+        result .+= pars.cib.Acib * s1 * s2 .* h.cib_template
     end
 
     # ------------------------------------------------------------------
@@ -155,9 +154,9 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
         # Translated directly for numerical accuracy:
         tr1 = tsz_g_ratio(ef_sz1, FG_FREQ_REF, 2.72548)
         tr2 = tsz_g_ratio(ef_sz2, FG_FREQ_REF, 2.72548)
-        cr1 = cib_mbb_sed_weight(pars[:beta_cib], 25.0, FG_FREQ_REF, ef_cib1)
-        cr2 = cib_mbb_sed_weight(pars[:beta_cib], 25.0, FG_FREQ_REF, ef_cib2)
-        xi_factor = -pars[:xi] * sqrt(pars[:Acib] * pars[:Atsz]) * (tr2 * cr1 + tr1 * cr2)
+        cr1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib1)
+        cr2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib2)
+        xi_factor = -pars.cib.xi * sqrt(pars.cib.Acib * pars.sz.Atsz) * (tr2 * cr1 + tr1 * cr2)
         result .+= xi_factor .* h.szxcib_template
     end
 
@@ -167,7 +166,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     if mode == "TT"
         ef1 = Float64(EFF_FREQ_RADIO[f1])
         ef2 = Float64(EFF_FREQ_RADIO[f2])
-        result .+= radio_ps_power(ell, pars[:Aradio], pars[:beta_radio], ef1, ef2, FG_FREQ_REF)
+        result .+= radio_ps_power(ell, pars.ps.Aradio, pars.ps.beta_radio, ef1, ef2, FG_FREQ_REF)
     end
 
     # ------------------------------------------------------------------
@@ -176,7 +175,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     if mode == "TT"
         ef1 = Float64(EFF_FREQ_CIB[f1])
         ef2 = Float64(EFF_FREQ_CIB[f2])
-        result .+= dusty_ps_power(ell, pars[:Adusty], pars[:beta_cib],
+        result .+= dusty_ps_power(ell, pars.ps.Adusty, pars.cib.beta_cib,
                                    ef1, ef2, FG_FREQ_REF, 25.0)
     end
 
@@ -185,8 +184,9 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     # ------------------------------------------------------------------
     if mode == "TT"
         key = Symbol("Asbpx_$(f1)x$(f2)")
-        if haskey(pars, key)
-            result .+= sub_pixel_power(ell, pars[key],
+        subpx_val = getproperty(pars.subpixel, key)
+        if subpx_val != 0
+            result .+= sub_pixel_power(ell, subpx_val,
                                         Float64(FWHM_ARCMIN[f1]),
                                         Float64(FWHM_ARCMIN[f2]))
         end
@@ -212,7 +212,7 @@ Compute the foreground D_ℓ model for all 15 cross-map-pair spectra in the give
 - `Vector{Vector{Float64}}` of length 15, each of length lmax+1
 """
 function compute_fg_model(mode::String, pair_freqs::Vector{Tuple{Int,Int}},
-                           ell::AbstractVector, pars::Dict{Symbol},
+                           ell::AbstractVector, pars::HillipopNuisance,
                            h::HillipopData)
     return [compute_foreground_dl(mode, f1, f2, ell, pars, h)
             for (f1, f2) in pair_freqs]

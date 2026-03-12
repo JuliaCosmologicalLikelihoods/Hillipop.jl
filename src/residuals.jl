@@ -29,12 +29,12 @@ Compute the calibration scale factor for cross-map-spectrum (map1 × map2) in `m
 # Returns
 - Scalar `Float64` calibration factor
 """
-function _cal_factor(mode::String, map1::String, map2::String, pars::Dict{Symbol})
-    c1 = pars[Symbol("cal$(map1)")]
-    c2 = pars[Symbol("cal$(map2)")]
-    pe1 = get(pars, Symbol("pe$(map1)"), 1.0)
-    pe2 = get(pars, Symbol("pe$(map2)"), 1.0)
-    Apl = pars[:A_planck]
+function _cal_factor(mode::String, map1::String, map2::String, pars::HillipopNuisance)
+    c1 = getproperty(pars.cal, Symbol("cal$(map1)"))
+    c2 = getproperty(pars.cal, Symbol("cal$(map2)"))
+    pe1 = getproperty(pars.cal, Symbol("pe$(map1)"))
+    pe2 = getproperty(pars.cal, Symbol("pe$(map2)"))
+    Apl = pars.cal.A_planck
 
     if mode == "TT"
         return c1 * c2 / Apl^2
@@ -56,14 +56,14 @@ Compute [D_data - cal * D_model] for all 15 cross-map-pair spectra.
 # Arguments
 - `mode`: `"TT"`, `"EE"`, `"TE"`, or `"ET"`
 - `dlth`: `Vector{Float64}` of length lmax+1, the theory D_ℓ for this mode
-- `pars`: `Dict{Symbol}` of nuisance parameters
+- `pars`: `HillipopNuisance` of nuisance parameters
 - `h`: `HillipopData`
 
 # Returns
 - `Matrix{Float64}` of shape `(nxspec, lmax+1)`, the residuals R
 """
 function compute_residuals(mode::String, dlth::AbstractVector,
-                           pars::Dict{Symbol}, h::HillipopData)
+                           pars::HillipopNuisance{T_par}, h::HillipopData) where {T_par}
     mapnames     = h.mapnames
     frequencies  = h.frequencies
     lmax         = h.lmax
@@ -86,7 +86,6 @@ function compute_residuals(mode::String, dlth::AbstractVector,
     dldata_mode = h.dldata[mode]   # (nxspec, lmax+1)
 
     # Residuals
-    T_par = valtype(pars)
     T_val = promote_type(eltype(dlth), T_par)
     R = zeros(T_val, nxspec, lmax + 1)
     for (xs, (map1, map2, f1, f2)) in enumerate(pairs)

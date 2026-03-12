@@ -135,9 +135,8 @@ end
 @model function _hillipop_model_A(h, ClTT, ClTE, ClEE, modes)
     nuis ~ to_submodel(hillipop_nuisance_priors(), false)
 
-    # Assemble Dict — type promoted so ForwardDiff Duals work end-to-end
-    T = promote_type(map(typeof, values(nuis))...)
-    pars = Dict{Symbol, T}(pairs(nuis)...)
+    # Assemble directly into HillipopNuisance
+    pars = HillipopNuisance(nuis)
 
     Turing.@addlogprob! compute_loglike(ClTT, ClTE, ClEE, pars, h; modes=modes)
 end

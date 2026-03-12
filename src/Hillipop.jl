@@ -24,13 +24,14 @@ using CMBForegrounds
 using FITSIO
 using Artifacts
 using NPZ
+include("nuisance.jl")
 include("structs.jl")
 include("data_io.jl")
 include("foreground_dispatch.jl")
 include("residuals.jl")
 include("likelihood.jl")
 
-export HillipopData, HillipopPars
+export HillipopData, HillipopNuisance, HillipopCalibration, HillipopDust, HillipopSZ, HillipopCIB, HillipopPointSources, HillipopSubPixel
 export load_hillipop, compute_loglike, build_residual_vector
 
 end # module Hillipop
