@@ -4,7 +4,7 @@
 Defines the typed hierarchy of nuisance parameters used by the Hillipop likelihood.
 """
 
-struct HillipopCalibration{T<:Real}
+Base.@kwdef struct HillipopCalibration{T<:Real}
     A_planck::T
     cal100A::T; cal100B::T
     cal143A::T; cal143B::T
@@ -14,28 +14,28 @@ struct HillipopCalibration{T<:Real}
     pe217A::T;  pe217B::T
 end
 
-struct HillipopDust{T<:Real}
+Base.@kwdef struct HillipopDust{T<:Real}
     AdustT::T;     AdustP::T
     beta_dustT::T; beta_dustP::T
 end
 
-struct HillipopSZ{T<:Real}
+Base.@kwdef struct HillipopSZ{T<:Real}
     Atsz::T
     Aksz::T
 end
 
-struct HillipopCIB{T<:Real}
+Base.@kwdef struct HillipopCIB{T<:Real}
     Acib::T
     beta_cib::T
     xi::T
 end
 
-struct HillipopPointSources{T<:Real}
+Base.@kwdef struct HillipopPointSources{T<:Real}
     Aradio::T; beta_radio::T
     Adusty::T
 end
 
-struct HillipopSubPixel{T<:Real}
+Base.@kwdef struct HillipopSubPixel{T<:Real}
     Asbpx_100x100::T
     Asbpx_100x143::T
     Asbpx_100x217::T
@@ -50,7 +50,7 @@ end
 Statically-typed container for all Hillipop PR4 nuisance parameters.
 Grouped into functional categories to aid clarity.
 """
-struct HillipopNuisance{T<:Real}
+Base.@kwdef struct HillipopNuisance{T<:Real}
     cal::HillipopCalibration{T}
     dust::HillipopDust{T}
     sz::HillipopSZ{T}

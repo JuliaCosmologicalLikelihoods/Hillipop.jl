@@ -103,16 +103,12 @@ const C_inv = Symmetric(inv(h_data.binned_invkll))
     ClTT, ClTE, ClEE = compute_theory_cls(θ_cosmo)
     
     # 5. Pack Nuisances
-    p = HillipopPars(
-        A_planck, cal100A, cal100B, cal143A, cal143B, cal217A, cal217B,
-        pe100A, pe100B, pe143A, pe143B, pe217A, pe217B,
-        AdustT, AdustP, beta_dustT, beta_dustP, Atsz, Aksz,
-        Acib, beta_cib, xi, Aradio, beta_radio, Adusty
-    )
-    
-    # Convert to Dict for the existing build_residual_vector interface
-    T_par = typeof(A_planck)
-    pars = convert(Dict{Symbol, T_par}, p)
+    pars = HillipopNuisance((
+        A_planck=A_planck, cal100A=cal100A, cal100B=cal100B, cal143A=cal143A, cal143B=cal143B, cal217A=cal217A, cal217B=cal217B,
+        pe100A=pe100A, pe100B=pe100B, pe143A=pe143A, pe143B=pe143B, pe217A=pe217A, pe217B=pe217B,
+        AdustT=AdustT, AdustP=AdustP, beta_dustT=beta_dustT, beta_dustP=beta_dustP, Atsz=Atsz, Aksz=Aksz,
+        Acib=Acib, beta_cib=beta_cib, xi=xi, Aradio=Aradio, beta_radio=beta_radio, Adusty=Adusty
+    ))
     
     # 6. Forward pass through Hillipop
     Xl = build_residual_vector(ClTT, ClTE, ClEE, pars, h_data)

@@ -219,7 +219,7 @@ result = hillipop_loglike_check(default_pars(), h, ClTT, ClTE, ClEE)
 println(result.diff)   # should be < 1e-10
 ```
 """
-function hillipop_loglike_check(pars::Dict{Symbol}, h::HillipopData,
+function hillipop_loglike_check(pars::HillipopNuisance, h::HillipopData,
                                   ClTT, ClTE, ClEE;
                                   modes::Tuple=("TT", "EE", "TE"))
     logL_direct = compute_loglike(ClTT, ClTE, ClEE, pars, h; modes=modes)
@@ -240,7 +240,7 @@ end
 
 Same check as `hillipop_loglike_check` but for the MvNormal Variant B model.
 """
-function hillipop_loglike_check_mvnormal(pars::Dict{Symbol}, h::HillipopData,
+function hillipop_loglike_check_mvnormal(pars::HillipopNuisance, h::HillipopData,
                                            ClTT, ClTE, ClEE;
                                            modes::Tuple=("TT", "EE", "TE"))
     logL_direct = compute_loglike(ClTT, ClTE, ClEE, pars, h; modes=modes)

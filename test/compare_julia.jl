@@ -25,7 +25,7 @@ function main()
     logL_jax = Float64(ref["logL"])
     
     # Compute in Julia
-    logL_jl = compute_loglike(ClTT, ClTE, ClEE, pars, h)
+    logL_jl = compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(pars), h)
     
     println("JAX logL:   ", logL_jax)
     println("Julia logL: ", logL_jl)
