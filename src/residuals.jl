@@ -24,7 +24,7 @@ Compute the calibration scale factor for cross-map-spectrum (map1 × map2) in `m
 # Arguments
 - `mode`: `"TT"`, `"EE"`, `"TE"`, or `"ET"`
 - `map1`, `map2`: map name strings, e.g. `"100A"`
-- `pars`: `Dict{Symbol}` containing `cal100A`, `pe100A`, `A_planck`, etc.
+- `pars`: `HillipopNuisance` containing calibration factors like `cal100A`, `pe100A`, `A_planck`, etc.
 
 # Returns
 - Scalar `Float64` calibration factor

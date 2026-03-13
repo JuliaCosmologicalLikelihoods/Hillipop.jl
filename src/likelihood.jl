@@ -210,7 +210,7 @@ Compute the Hillipop PR4 log-likelihood.
 
 # Arguments
 - `ClTT`, `ClTE`, `ClEE`: `Vector` of C_ℓ in K², starting at ℓ=2
-- `pars`: `HillipopNuisance` (or `Dict{Symbol}`) of nuisance parameters (see parameter list below)
+- `pars`: `HillipopNuisance` (or `NamedTuple`) of nuisance parameters (see parameter list below)
 - `h`: `HillipopData` struct from `load_hillipop`
 
 # Keywords
@@ -242,12 +242,6 @@ end
 
 function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,
                           pars::NamedTuple, h::HillipopData;
-                          modes::Tuple=("TT", "EE", "TE"))
-    return compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(pars), h; modes=modes)
-end
-
-function compute_loglike(ClTT::AbstractVector, ClTE::AbstractVector, ClEE::AbstractVector,
-                          pars::Dict{Symbol}, h::HillipopData;
                           modes::Tuple=("TT", "EE", "TE"))
     return compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(pars), h; modes=modes)
 end

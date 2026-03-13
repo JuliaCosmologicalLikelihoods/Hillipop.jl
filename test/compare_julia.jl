@@ -17,10 +17,9 @@ function main()
     ClTE = Float64.(ref["ClTE"])
     
     # Convert string keys to Symbol
-    pars = Dict{Symbol, Float64}()
-    for (k, v) in ref["params"]
-        pars[Symbol(k)] = Float64(v)
-    end
+    pars_keys = Tuple(Symbol(k) for k in keys(ref["params"]))
+    pars_vals = Tuple(Float64(v) for v in values(ref["params"]))
+    pars = NamedTuple{pars_keys}(pars_vals)
     
     logL_jax = Float64(ref["logL"])
     

@@ -17,19 +17,40 @@ using DelimitedFiles
 # Effective frequencies per foreground component (matching JAX fgmodel class)
 # These map nominal frequencies (100, 143, 217 GHz) to effective band centers.
 # ---------------------------------------------------------------------------
-const EFF_FREQ_SZ    = Dict(100 => 100.24,  143 => 143.0,   217 => 222.044)
-const EFF_FREQ_DUST  = Dict(100 => 105.2,   143 => 147.5,   217 => 228.1,  353 => 370.5)
-const EFF_FREQ_CIB   = EFF_FREQ_DUST   # same effective frequencies
-const EFF_FREQ_RADIO = Dict(100 => 100.4,   143 => 140.5,   217 => 218.6)
+function eff_freq_sz(f::Int)
+    f == 100 && return 100.24
+    f == 143 && return 143.0
+    f == 217 && return 222.044
+    return 0.0
+end
+function eff_freq_dust(f::Int)
+    f == 100 && return 105.2
+    f == 143 && return 147.5
+    f == 217 && return 228.1
+    f == 353 && return 370.5
+    return 0.0
+end
+const eff_freq_cib = eff_freq_dust   # same effective frequencies
+function eff_freq_radio(f::Int)
+    f == 100 && return 100.4
+    f == 143 && return 140.5
+    f == 217 && return 218.6
+    return 0.0
+end
 
 # Reference frequency for all foreground components (matches JAX f0 = 143)
 const FG_FREQ_REF = 143.0
 
 # FWHM per nominal frequency, used by sub-pixel model (arcmin)
-const FWHM_ARCMIN = Dict(100 => 9.68, 143 => 7.30, 217 => 5.02)
+function fwhm_arcmin(f::Int)
+    f == 100 && return 9.68
+    f == 143 && return 7.30
+    f == 217 && return 5.02
+    return 0.0
+end
 
 # Dust reference frequency (353 GHz effective)
-const DUST_FREQ_REF = EFF_FREQ_DUST[353]  # 370.5 GHz
+const DUST_FREQ_REF = eff_freq_dust(353)  # 370.5 GHz
 
 # ll2pi shape: ℓ(ℓ+1)/(3000·3001), length lmax+1
 function _ll2pi(lmax::Int)
@@ -44,18 +65,15 @@ end
 # the order they appear in the dust template columns.
 # Dust template columns: 100x100, 100x143, 100x217, 143x143, 143x217, 217x217
 # ---------------------------------------------------------------------------
-const _DUST_PAIR_IDX = Dict(
-    (100, 100) => 1,
-    (100, 143) => 2,
-    (100, 217) => 3,
-    (143, 143) => 4,
-    (143, 217) => 5,
-    (217, 217) => 6,
-)
-
 function _dust_template_idx(f1::Int, f2::Int)
     k = f1 <= f2 ? (f1, f2) : (f2, f1)
-    return _DUST_PAIR_IDX[k]
+    k == (100, 100) && return 1
+    k == (100, 143) && return 2
+    k == (100, 217) && return 3
+    k == (143, 143) && return 4
+    k == (143, 217) && return 5
+    k == (217, 217) && return 6
+    return 0
 end
 
 
@@ -112,14 +130,14 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     tmpl_dust = h.dust_templates[mode][tidx]
     A1, A2, β1, β2 = _dust_AB(mode, pars)
     res = dust_model_template_power(ell, tmpl_dust, A1, A2, β1, β2,
-                                          Float64(EFF_FREQ_DUST[f1]),
-                                          Float64(EFF_FREQ_DUST[f2]),
+                                          eff_freq_dust(f1),
+                                          eff_freq_dust(f2),
                                           DUST_FREQ_REF, 19.6)
 
     # 2. tSZ (TT only)
     if mode == "TT"
-        ef1 = Float64(EFF_FREQ_SZ[f1])
-        ef2 = Float64(EFF_FREQ_SZ[f2])
+        ef1 = eff_freq_sz(f1)
+        ef2 = eff_freq_sz(f2)
         res = res .+ tsz_cross_power(h.tsz_template, pars.sz.Atsz, ef1, ef2,
                               FG_FREQ_REF, 0.0, 3000.0, ell)
     end
@@ -131,8 +149,8 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
 
     # 4. Clustered CIB (TT only)
     if mode == "TT"
-        ef1 = Float64(EFF_FREQ_CIB[f1])
-        ef2 = Float64(EFF_FREQ_CIB[f2])
+        ef1 = eff_freq_cib(f1)
+        ef2 = eff_freq_cib(f2)
         s1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef1)
         s2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef2)
         res = res .+ (pars.cib.Acib * s1 * s2 .* h.cib_template)
@@ -140,10 +158,10 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
 
     # 5. SZ×CIB (TT only)
     if mode == "TT"
-        ef_sz1  = Float64(EFF_FREQ_SZ[f1])
-        ef_sz2  = Float64(EFF_FREQ_SZ[f2])
-        ef_cib1 = Float64(EFF_FREQ_CIB[f1])
-        ef_cib2 = Float64(EFF_FREQ_CIB[f2])
+        ef_sz1  = eff_freq_sz(f1)
+        ef_sz2  = eff_freq_sz(f2)
+        ef_cib1 = eff_freq_cib(f1)
+        ef_cib2 = eff_freq_cib(f2)
         tr1 = tsz_g_ratio(ef_sz1, FG_FREQ_REF, 2.72548)
         tr2 = tsz_g_ratio(ef_sz2, FG_FREQ_REF, 2.72548)
         cr1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib1)
@@ -155,15 +173,15 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
     # 6. Radio Point Sources (TT only)
     if mode == "TT"
         res = res .+ radio_ps_power(ell, pars.ps.Aradio, pars.ps.beta_radio, 
-                                   Float64(EFF_FREQ_RADIO[f1]), 
-                                   Float64(EFF_FREQ_RADIO[f2]), FG_FREQ_REF)
+                                   eff_freq_radio(f1), 
+                                   eff_freq_radio(f2), FG_FREQ_REF)
     end
 
     # 7. Dusty Point Sources (TT only)
     if mode == "TT"
         res = res .+ dusty_ps_power(ell, pars.ps.Adusty, pars.cib.beta_cib,
-                                   Float64(EFF_FREQ_CIB[f1]), 
-                                   Float64(EFF_FREQ_CIB[f2]), FG_FREQ_REF, 25.0)
+                                   eff_freq_cib(f1), 
+                                   eff_freq_cib(f2), FG_FREQ_REF, 25.0)
     end
 
     # 8. Sub-pixel effect (TT only)
@@ -171,8 +189,8 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
         subpx_val = _get_subpixel(pars.subpixel, f1, f2)
         if subpx_val != 0
             res = res .+ sub_pixel_power(ell, subpx_val,
-                                        Float64(FWHM_ARCMIN[f1]),
-                                        Float64(FWHM_ARCMIN[f2]))
+                                        fwhm_arcmin(f1),
+                                        fwhm_arcmin(f2))
         end
     end
 

@@ -11,28 +11,28 @@ Base.@kwdef struct HillipopCalibration{T<:Real}
     cal217A::T = 1.0; cal217B::T = 1.0
     pe100A::T = 1.0;  pe100B::T = 1.0
     pe143A::T = 1.0;  pe143B::T = 1.0
-    pe217A::T = 1.0;  pe217B::T = 1.0
+    pe217A::T = 0.975; pe217B::T = 0.975
 end
 
 Base.@kwdef struct HillipopDust{T<:Real}
-    AdustT::T = 0.0;     AdustP::T = 0.0
-    beta_dustT::T = 1.5; beta_dustP::T = 1.5
+    AdustT::T = 1.0;     AdustP::T = 1.0
+    beta_dustT::T = 1.51; beta_dustP::T = 1.59
 end
 
 Base.@kwdef struct HillipopSZ{T<:Real}
-    Atsz::T = 0.0
-    Aksz::T = 0.0
+    Atsz::T = 1.0
+    Aksz::T = 1.0
 end
 
 Base.@kwdef struct HillipopCIB{T<:Real}
-    Acib::T = 0.0
+    Acib::T = 1.0
     beta_cib::T = 1.75
     xi::T = 0.0
 end
 
 Base.@kwdef struct HillipopPointSources{T<:Real}
-    Aradio::T = 0.0; beta_radio::T = -0.7
-    Adusty::T = 0.0
+    Aradio::T = 1.0; beta_radio::T = -0.8
+    Adusty::T = 1.0
 end
 
 Base.@kwdef struct HillipopSubPixel{T<:Real}
@@ -75,9 +75,9 @@ function HillipopNuisance()
     return HillipopNuisance{Float64}()
 end
 
-# Unified constructor from any flat collection (Dict, NamedTuple, Pairs)
+# Unified constructor from any flat collection (NamedTuple, Pairs)
 # This handles promotion and mapping to sub-structs
-function HillipopNuisance(collection::Union{Dict{Symbol, <:Any}, NamedTuple, Base.Iterators.Pairs})
+function HillipopNuisance(collection::Union{NamedTuple, Base.Iterators.Pairs})
     # Find common type for promotion
     vals = values(collection)
     T = isempty(vals) ? Float64 : promote_type(typeof.(vals)...)
