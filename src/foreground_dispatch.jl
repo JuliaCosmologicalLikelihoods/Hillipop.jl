@@ -116,7 +116,7 @@ Returns a `Vector{Float64}` of length `lmax+1`.
 - `mode`: one of `"TT"`, `"EE"`, `"TE"`, `"ET"`
 - `f1`, `f2`: nominal frequencies (Int, e.g. 100, 143, 217)
 - `ell`: 0-based multipole vector
-- `pars`: `Dict{Symbol,Float64}` of nuisance parameters
+- `pars`: `HillipopNuisance` of nuisance parameters
 - `h`: `HillipopData` struct (for templates and lmax)
 """
 function compute_foreground_dl(mode::String, f1::Int, f2::Int,
@@ -218,7 +218,7 @@ Compute the foreground D_ℓ model for all 15 cross-map-pair spectra in the give
 - `mode`: `"TT"`, `"EE"`, `"TE"`, or `"ET"`
 - `pair_freqs`: Vector of `(Int,Int)` nominal frequency pairs (length nxspec=15)
 - `ell`: multipole vector 0..lmax
-- `pars`: nuisance parameter dict
+- `pars`: `HillipopNuisance` of nuisance parameters
 - `h`: HillipopData
 
 # Returns
