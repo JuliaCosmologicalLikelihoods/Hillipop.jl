@@ -5,6 +5,7 @@ using Turing
 using Artifacts
 using LinearAlgebra
 using ForwardDiff
+using Mooncake
 using ADTypes
 using Lux
 using OptimizationOptimJL: LBFGS
@@ -76,34 +77,44 @@ best_lp = -Inf
 best_run = 0
 best_params = nothing
 
-println("\nStarting $num_runs MAP estimation runs (L-BFGS, m=50, maxiters=500)...")
+println("\nStarting $num_runs MAP estimation runs (L-BFGS, m=50, maxiters=500, Mooncake AD)...")
 
 for i in 1:num_runs
     println("\n--- Run $i ---")
 
     # Draw initial point from prior
 
-    map_result = maximum_a_posteriori(
-        model,
-        LBFGS(m=50);
-        adtype   = AutoForwardDiff(),
-        maxiters = 500
-    )
 
-    println("Final log-posterior: ", map_result.lp)
-    println("Parameters:")
-    println(map_result.params)
+    try
+        @time map_result = maximum_a_posteriori(
+            model,
+            LBFGS(m=50);
+            adtype   = AutoMooncake(),
+            maxiters = 500,
+            show_trace = false
+        )
 
-    if map_result.lp > best_lp
-        global best_lp = map_result.lp
-        global best_run = i
-        global best_params = map_result.params
+        println("Final log-posterior: ", map_result.lp)
+        println("Parameters:")
+        println(map_result.params)
+
+        if map_result.lp > best_lp
+            global best_lp = map_result.lp
+            global best_run = i
+            global best_params = map_result.params
+        end
+    catch e
+        println("Run $i failed: ", e)
     end
 end
 
-println("\n" * "="^50)
-println("MAP ESTIMATION SUMMARY")
-println("="^50)
-@printf("Best log-posterior: %.4f (from Run %d)\n", best_lp, best_run)
-println("\nBest Parameters:")
-display(best_params)
+if best_run > 0
+    println("\n" * "="^50)
+    println("MAP ESTIMATION SUMMARY")
+    println("="^50)
+    @printf("Best log-posterior: %.4f (from Run %d)\n", best_lp, best_run)
+    println("\nBest Parameters:")
+    display(best_params)
+else
+    println("\nAll runs failed.")
+end

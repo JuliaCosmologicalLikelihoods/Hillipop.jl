@@ -4,7 +4,7 @@ using AbstractCosmologicalEmulators
 using Turing
 using Artifacts
 using LinearAlgebra
-using ForwardDiff
+using Mooncake
 using ADTypes
 using Lux
 
@@ -31,29 +31,29 @@ const fac = @. 2π / (ell[1:idx_lmax] * (ell[1:idx_lmax] + 1)) * 1e-12
     H0        ~ Uniform(60.0, 82.0)
     omega_b   ~ Uniform(0.019, 0.026)
     omega_cdm ~ Uniform(0.05, 0.255)
-    tau_reio  ~ Uniform(0.02, 0.08)
+    tau_reio  ~ Normal(0.0506, 0.0086)
 
     # --- Nuisance Priors (HiLLiPoP PR4) ---
     A_planck   ~ Truncated(Normal(1.0, 0.0025), 0.9, 1.1)
     cal100A    ~ Uniform(0.9, 1.1); cal100B ~ Uniform(0.9, 1.1)
     cal143B    ~ Uniform(0.9, 1.1)
     cal217A    ~ Uniform(0.9, 1.1); cal217B ~ Uniform(0.9, 1.1)
-    
+
     AdustT     ~ Truncated(Normal(1.0, 0.1), 0.5, 1.5)
     AdustP     ~ Truncated(Normal(1.0, 0.1), 0.7, 1.3)
     beta_dustT ~ Truncated(Normal(1.51, 0.01), 1.4, 1.6)
     beta_dustP ~ Truncated(Normal(1.59, 0.01), 1.5, 1.7)
-    
+
     Atsz       ~ Uniform(0.0, 50.0); Aksz ~ Uniform(0.0, 50.0)
     Acib       ~ Uniform(0.0, 20.0); beta_cib ~ Truncated(Normal(1.75, 0.06), 1.6, 1.9)
     xi         ~ Uniform(-1.0, 1.0)
-    
+
     Aradio     ~ Uniform(0.0, 150.0)
     Adusty     ~ Uniform(0.0, 150.0)
 
     # --- Theory Spectra ---
     x_cosmo = [ln10As, ns, H0, omega_b, omega_cdm, tau_reio]
-    
+
     # ForwardDiff through emulators and likelihood
     raw_TT = Capse.get_Cℓ(x_cosmo, emu_TT)
     raw_TE = Capse.get_Cℓ(x_cosmo, emu_TE)
@@ -65,9 +65,9 @@ const fac = @. 2π / (ell[1:idx_lmax] * (ell[1:idx_lmax] + 1)) * 1e-12
 
     # --- Likelihood ---
     pars = (
-        A_planck=A_planck, cal100A=cal100A, cal100B=cal100B, cal143B=cal143B, 
-        cal217A=cal217A, cal217B=cal217B, AdustT=AdustT, AdustP=AdustP, 
-        beta_dustT=beta_dustT, beta_dustP=beta_dustP, Atsz=Atsz, Aksz=Aksz, 
+        A_planck=A_planck, cal100A=cal100A, cal100B=cal100B, cal143B=cal143B,
+        cal217A=cal217A, cal217B=cal217B, AdustT=AdustT, AdustP=AdustP,
+        beta_dustT=beta_dustT, beta_dustP=beta_dustP, Atsz=Atsz, Aksz=Aksz,
         Acib=Acib, beta_cib=beta_cib, xi=xi, Aradio=Aradio, Adusty=Adusty
     )
 
@@ -81,7 +81,7 @@ println("\nStarting NUTS sampling (50 adaptation, 50 samples)...")
 println("AD Backend: AutoForwardDiff()")
 
 # Syntax for modern Turing NUTS with explicit AD choice
-chain = sample(model, NUTS(50, 0.65; adtype=AutoForwardDiff()), 100)
+chain = sample(model, NUTS(500, 0.65; adtype=AutoMooncake()), 1000)
 
 println("\nSampling Complete!")
-display(chain)
+println(describe(chain))
