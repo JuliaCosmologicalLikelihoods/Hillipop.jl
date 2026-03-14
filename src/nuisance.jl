@@ -82,50 +82,58 @@ function HillipopNuisance(collection::Union{NamedTuple, Base.Iterators.Pairs})
     vals = values(collection)
     T = isempty(vals) ? Float64 : promote_type(typeof.(vals)...)
     
+    # Pre-generate defaults to avoid repeated allocation
+    d_cal = HillipopCalibration{T}()
+    d_dust = HillipopDust{T}()
+    d_sz = HillipopSZ{T}()
+    d_cib = HillipopCIB{T}()
+    d_ps = HillipopPointSources{T}()
+    d_sbpx = HillipopSubPixel{T}()
+
     # Calibration
     cal = HillipopCalibration{T}(
-        T(get(collection, :A_planck, 1.0)),
-        T(get(collection, :cal100A, 1.0)), T(get(collection, :cal100B, 1.0)),
-        T(get(collection, :cal143A, 1.0)), T(get(collection, :cal143B, 1.0)),
-        T(get(collection, :cal217A, 1.0)), T(get(collection, :cal217B, 1.0)),
-        T(get(collection, :pe100A, 1.0)),  T(get(collection, :pe100B, 1.0)),
-        T(get(collection, :pe143A, 1.0)),  T(get(collection, :pe143B, 1.0)),
-        T(get(collection, :pe217A, 1.0)),  T(get(collection, :pe217B, 1.0))
+        T(get(collection, :A_planck, d_cal.A_planck)),
+        T(get(collection, :cal100A, d_cal.cal100A)), T(get(collection, :cal100B, d_cal.cal100B)),
+        T(get(collection, :cal143A, d_cal.cal143A)), T(get(collection, :cal143B, d_cal.cal143B)),
+        T(get(collection, :cal217A, d_cal.cal217A)), T(get(collection, :cal217B, d_cal.cal217B)),
+        T(get(collection, :pe100A, d_cal.pe100A)),  T(get(collection, :pe100B, d_cal.pe100B)),
+        T(get(collection, :pe143A, d_cal.pe143A)),  T(get(collection, :pe143B, d_cal.pe143B)),
+        T(get(collection, :pe217A, d_cal.pe217A)),  T(get(collection, :pe217B, d_cal.pe217B))
     )
     
     # Dust
     dust = HillipopDust{T}(
-        T(get(collection, :AdustT, 0.0)),     T(get(collection, :AdustP, 0.0)),
-        T(get(collection, :beta_dustT, 1.5)), T(get(collection, :beta_dustP, 1.5))
+        T(get(collection, :AdustT, d_dust.AdustT)),     T(get(collection, :AdustP, d_dust.AdustP)),
+        T(get(collection, :beta_dustT, d_dust.beta_dustT)), T(get(collection, :beta_dustP, d_dust.beta_dustP))
     )
     
     # SZ
     sz = HillipopSZ{T}(
-        T(get(collection, :Atsz, 0.0)),
-        T(get(collection, :Aksz, 0.0))
+        T(get(collection, :Atsz, d_sz.Atsz)),
+        T(get(collection, :Aksz, d_sz.Aksz))
     )
     
     # CIB
     cib = HillipopCIB{T}(
-        T(get(collection, :Acib, 0.0)),
-        T(get(collection, :beta_cib, 1.75)),
-        T(get(collection, :xi, 0.0))
+        T(get(collection, :Acib, d_cib.Acib)),
+        T(get(collection, :beta_cib, d_cib.beta_cib)),
+        T(get(collection, :xi, d_cib.xi))
     )
     
     # PS
     ps = HillipopPointSources{T}(
-        T(get(collection, :Aradio, 0.0)), T(get(collection, :beta_radio, -0.7)),
-        T(get(collection, :Adusty, 0.0))
+        T(get(collection, :Aradio, d_ps.Aradio)), T(get(collection, :beta_radio, d_ps.beta_radio)),
+        T(get(collection, :Adusty, d_ps.Adusty))
     )
     
     # Subpixel
     subpixel = HillipopSubPixel{T}(
-        T(get(collection, :Asbpx_100x100, 0.0)),
-        T(get(collection, :Asbpx_100x143, 0.0)),
-        T(get(collection, :Asbpx_100x217, 0.0)),
-        T(get(collection, :Asbpx_143x143, 0.0)),
-        T(get(collection, :Asbpx_143x217, 0.0)),
-        T(get(collection, :Asbpx_217x217, 0.0))
+        T(get(collection, :Asbpx_100x100, d_sbpx.Asbpx_100x100)),
+        T(get(collection, :Asbpx_100x143, d_sbpx.Asbpx_100x143)),
+        T(get(collection, :Asbpx_100x217, d_sbpx.Asbpx_100x217)),
+        T(get(collection, :Asbpx_143x143, d_sbpx.Asbpx_143x143)),
+        T(get(collection, :Asbpx_143x217, d_sbpx.Asbpx_143x217)),
+        T(get(collection, :Asbpx_217x217, d_sbpx.Asbpx_217x217))
     )
     
     return HillipopNuisance{T}(cal, dust, sz, cib, ps, subpixel)

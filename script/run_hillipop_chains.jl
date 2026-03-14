@@ -24,7 +24,7 @@ const emu_TT = Capse.load_emulator(joinpath(path, "TT/"), emu=LuxEmulator)
 const emu_TE = Capse.load_emulator(joinpath(path, "TE/"), emu=LuxEmulator)
 const emu_EE = Capse.load_emulator(joinpath(path, "EE/"), emu=LuxEmulator)
 
-const ell = emu_TT.ℓgrid[3:5001] 
+const ell = emu_TT.ℓgrid[3:5001]
 const idx_lmax = findfirst(==(lmax_h), ell)
 const fac = @. 2π / (ell[1:idx_lmax] * (ell[1:idx_lmax] + 1)) * 1e-12
 
@@ -60,9 +60,9 @@ const fac = @. 2π / (ell[1:idx_lmax] * (ell[1:idx_lmax] + 1)) * 1e-12
 
     nuisance = (
         A_planck = A_planck,
-        cal100A = cal100A, cal100B = cal100B, cal143B = cal143B, 
+        cal100A = cal100A, cal100B = cal100B, cal143B = cal143B,
         cal217A = cal217A, cal217B = cal217B,
-        AdustT = AdustT, AdustP = AdustP, 
+        AdustT = AdustT, AdustP = AdustP,
         beta_dustT = beta_dustT, beta_dustP = beta_dustP,
         Atsz = Atsz, Aksz = Aksz,
         Acib = Acib, beta_cib = beta_cib, xi = xi,
@@ -88,7 +88,7 @@ flush(stdout)
 model = hillipop_production_model(h_data, emu_TT, emu_TE, emu_EE, idx_lmax, fac)
 
 # Running strictly with Mooncake
-chain = sample(model, NUTS(250, 0.65; adtype=AutoMooncake()), 500)
+chain = sample(model, NUTS(50, 0.65; adtype=AutoMooncake()), 50)
 
 println("\n" * "="^60)
 println("MCMC ANALYSIS OUTCOME (MOONCAKE)")
