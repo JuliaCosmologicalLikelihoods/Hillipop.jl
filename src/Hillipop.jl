@@ -31,6 +31,7 @@ include("data_io.jl")
 include("foreground_dispatch.jl")
 include("residuals.jl")
 include("likelihood.jl")
+include("ad_rules.jl")
 
 export HillipopData, HillipopNuisance, HillipopCalibration, HillipopDust, HillipopSZ, HillipopCIB, HillipopPointSources, HillipopSubPixel
 export load_hillipop, compute_loglike, build_residual_vector

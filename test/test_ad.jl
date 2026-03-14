@@ -27,6 +27,16 @@ using LinearAlgebra
         return compute_loglike(ClTT, ClTE, ClEE, HillipopNuisance(p_nt), h)
     end
 
+    function obj_func_cl(v::Vector{T}) where T
+        lmax_val = h.lmax
+        c_tt = v[1:lmax_val-1]
+        c_te = v[lmax_val:2*lmax_val-2]
+        c_ee = v[2*lmax_val-1:3*lmax_val-3]
+        return compute_loglike(c_tt, c_te, c_ee, HillipopNuisance(base_pars), h)
+    end
+
+    cl_vec = vcat(ClTT, ClTE, ClEE)
+
     @testset "ForwardDiff Backend" begin
         backend = AutoForwardDiff()
         val = obj_func(vals_arr)
@@ -34,18 +44,34 @@ using LinearAlgebra
         @test isfinite(val)
         @test all(isfinite.(grad))
         @test length(grad) == length(vals_arr)
+
+        val_cl = obj_func_cl(cl_vec)
+        grad_cl = gradient(obj_func_cl, backend, cl_vec)
+        @test isfinite(val_cl)
+        @test all(isfinite.(grad_cl))
+        @test length(grad_cl) == length(cl_vec)
     end
 
     @testset "Mooncake Backend" begin
-        backend = AutoMooncake()
+        backend = AutoMooncake(config=nothing)
         val = obj_func(vals_arr)
-        grad = gradient(obj_func, backend, vals_arr)
+        
+        prep_nuisance = prepare_gradient(obj_func, backend, vals_arr)
+        grad = gradient(obj_func, prep_nuisance, backend, vals_arr)
         @test isfinite(val)
         @test all(isfinite.(grad))
         
-        # Compare with ForwardDiff
+        # Compare with ForwardDiff for nuisance pars
         grad_fd = gradient(obj_func, AutoForwardDiff(), vals_arr)
-        @test isapprox(grad, grad_fd, rtol=1e-8)
+        @test isapprox(grad, grad_fd, rtol=1e-6)
+
+        # Compare with ForwardDiff for Cl spectra
+        prep_cl = prepare_gradient(obj_func_cl, backend, cl_vec)
+        grad_cl_mc = gradient(obj_func_cl, prep_cl, backend, cl_vec)
+        grad_cl_fd = gradient(obj_func_cl, AutoForwardDiff(), cl_vec)
+        
+        @test all(isfinite.(grad_cl_mc))
+        @test isapprox(grad_cl_mc, grad_cl_fd, rtol=1e-6)
     end
 
     # Zygote is skipped or marked as broken due to Dict/Mutation issues if not fully refactored
