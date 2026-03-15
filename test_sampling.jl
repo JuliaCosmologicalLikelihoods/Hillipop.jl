@@ -77,11 +77,11 @@ end
 # 3. Instantiate and Sample
 model = hillipop_full_model(h, emu_TT, emu_TE, emu_EE, idx_lmax, fac)
 
-println("\nStarting NUTS sampling (50 adaptation, 50 samples)...")
+println("\nStarting NUTS sampling (500 adaptation, 2000 samples)...")
 println("AD Backend: AutoForwardDiff()")
 
 # Syntax for modern Turing NUTS with explicit AD choice
-chain = sample(model, NUTS(500, 0.65; adtype=AutoMooncake()), 1000)
+chain = sample(model, NUTS(500, 0.65; adtype=AutoMooncake()), 2000)
 
 println("\nSampling Complete!")
 println(describe(chain))
