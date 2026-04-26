@@ -110,7 +110,9 @@ end
 Compute the total foreground D_ℓ contribution for cross-map-spectrum `xs`
 in polarization mode `mode`, for nominal frequencies `f1` and `f2`.
 
-Returns a `Vector{Float64}` of length `lmax+1`.
+Returns a `Vector{T_par}` of length `lmax+1`, where `T_par` is the element
+type of the nuisance parameters in `pars` (typically `Float64`, but
+`ForwardDiff.Dual` when differentiated).
 
 # Arguments
 - `mode`: one of `"TT"`, `"EE"`, `"TE"`, `"ET"`
@@ -123,8 +125,7 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
                                ell::AbstractVector, pars::HillipopNuisance{T_par},
                                h::HillipopData) where {T_par}
     lmax = h.lmax
-    T = T_par
-    
+
     # 1. Galactic Dust (template-based)
     tidx = _dust_template_idx(f1, f2)
     tmpl_dust = h.dust_templates[mode][tidx]
@@ -149,25 +150,20 @@ function compute_foreground_dl(mode::String, f1::Int, f2::Int,
 
     # 4. Clustered CIB (TT only)
     if mode == "TT"
-        ef1 = eff_freq_cib(f1)
-        ef2 = eff_freq_cib(f2)
-        s1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef1)
-        s2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef2)
-        res = res .+ (pars.cib.Acib * s1 * s2 .* h.cib_template)
+        res = res .+ cib_clustered_template_power(h.cib_template,
+                                                   pars.cib.Acib, pars.cib.beta_cib,
+                                                   25.0, FG_FREQ_REF,
+                                                   eff_freq_cib(f1), eff_freq_cib(f2))
     end
 
     # 5. SZ×CIB (TT only)
     if mode == "TT"
-        ef_sz1  = eff_freq_sz(f1)
-        ef_sz2  = eff_freq_sz(f2)
-        ef_cib1 = eff_freq_cib(f1)
-        ef_cib2 = eff_freq_cib(f2)
-        tr1 = tsz_g_ratio(ef_sz1, FG_FREQ_REF, 2.72548)
-        tr2 = tsz_g_ratio(ef_sz2, FG_FREQ_REF, 2.72548)
-        cr1 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib1)
-        cr2 = cib_mbb_sed_weight(pars.cib.beta_cib, 25.0, FG_FREQ_REF, ef_cib2)
-        xi_factor = -pars.cib.xi * sqrt(pars.cib.Acib * pars.sz.Atsz) * (tr2 * cr1 + tr1 * cr2)
-        res = res .+ (xi_factor .* h.szxcib_template)
+        res = res .+ tsz_cib_template_power(h.szxcib_template,
+                                             pars.cib.xi, pars.sz.Atsz, pars.cib.Acib,
+                                             pars.cib.beta_cib, 25.0,
+                                             FG_FREQ_REF, FG_FREQ_REF,
+                                             eff_freq_sz(f1),  eff_freq_sz(f2),
+                                             eff_freq_cib(f1), eff_freq_cib(f2))
     end
 
     # 6. Radio Point Sources (TT only)
